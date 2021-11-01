@@ -2,6 +2,7 @@
 
 int main() {
 	qws::Service s;
+
 	// Simple base route
 	s.route("/", [](qws::Request& req) {
 		return qws::html(

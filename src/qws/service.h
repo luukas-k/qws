@@ -112,14 +112,23 @@ namespace qws {
 
 	class ResponseBuilder {
 	public:
-		ResponseBuilder(){}
+		ResponseBuilder()
+			:
+			m_Code(200),
+			m_Content("")
+		{}
 
+		void set_statuscode(int val) {
+			m_Code = val;
+		}
 		void set_content(std::string str) {
 			m_Content = str;
 		}
 		std::string build() {
 			std::string res;
-			res.append("HTTP/1.1 200 OK\r\n");
+			res.append("HTTP/1.1 ");
+			res.append(std::to_string(m_Code));
+			res.append(" OK\r\n");
 			// res.append("Date: Mon, 27 Jul 2009 12:28:53 GMT\n");
 			// res.append("Server: Apache/2.2.14 (Win32)\n");
 			// res.append("Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT\n");
@@ -132,6 +141,7 @@ namespace qws {
 			return res;
 		}
 	private:
+		int m_Code;
 		std::string m_Content;
 	};
 
@@ -182,7 +192,6 @@ namespace qws {
 
 				Request r(request);
 
-				ResponseBuilder rb;
 
 				auto strip_last = [](auto str) {
 					auto a = split(str, "/");
@@ -194,29 +203,38 @@ namespace qws {
 					return res;
 				};
 
-				auto matches = [&](const std::string& p) {
-					if(p == r.path()) 
-						return 2;
-					if(split(p, "/").size() == split(r.path(), "/").size() && strip_last(p) == strip_last(r.path())) 
-						return 1;
-					return 0;
-				};
+				auto matches = [&](const std::string& pathSpec, const std::string& path) -> bool {
+					auto pathSpecSplit = split(pathSpec, "/");
+					auto pathSplit = split(path, "/");
 
-				rb.set_content("no handler");
-				int highest = 0;
-				for (auto& h : m_Handlers) {
-					auto v = matches(h.first);
-					if (v > highest) {
-						highest = v;
+					if(pathSpecSplit.size() != pathSplit.size()) 
+						return false;
+
+					auto match = [](std::string spec, std::string pathComp) {
+						if (spec[0] == ':') {
+							return true;
+						}
+						return spec == pathComp;
+					};
+
+					for (u32 i = 0; i < pathSpecSplit.size(); i++) {
+						auto specPart = pathSpecSplit[i];
+						auto pathPart = pathSplit[i];
+						if(!match(specPart, pathPart))
+							return false;
 					}
-				}
+					return true;
+				};
+				
+				ResponseBuilder rb;
+				rb.set_statuscode(404);
 				for (auto& h : m_Handlers) {
-					if (matches(h.first) == highest) {
+					if (matches(h.first, r.path())) {
+						rb.set_statuscode(200);
 						rb.set_content(h.second(r));
 						break;
 					}
 				}
-
 				s.send(rb.build());
 				std::cout << "Client served." << std::endl;
 				s.close();
