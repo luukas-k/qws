@@ -4,6 +4,7 @@
 #include <string>
 #include <functional>
 #include <unordered_map>
+#include <optional>
 #include <memory>
 
 #define WIN32_LEAN_AND_MEAN
@@ -129,9 +130,6 @@ namespace qws {
 			res.append("HTTP/1.1 ");
 			res.append(std::to_string(m_Code));
 			res.append(" OK\r\n");
-			// res.append("Date: Mon, 27 Jul 2009 12:28:53 GMT\n");
-			// res.append("Server: Apache/2.2.14 (Win32)\n");
-			// res.append("Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT\n");
 			res.append("Content-Length: " + std::to_string(m_Content.size()) + "\n");
 			res.append("Content-Type: text/html\n");
 			res.append("Connection: Closed\n");
@@ -203,6 +201,16 @@ namespace qws {
 					return res;
 				};
 
+				auto parse_int = [](std::string str) -> std::optional<int> {
+					try {
+						int val = std::stoi(str);
+						return val;
+					}
+					catch (...) {
+						return {};
+					}
+				};
+
 				auto matches = [&](const std::string& pathSpec, const std::string& path) -> bool {
 					auto pathSpecSplit = split(pathSpec, "/");
 					auto pathSplit = split(path, "/");
@@ -210,9 +218,17 @@ namespace qws {
 					if(pathSpecSplit.size() != pathSplit.size()) 
 						return false;
 
-					auto match = [](std::string spec, std::string pathComp) {
+					auto matches_type = [&](std::string type, std::string val) {
+						if (type == "int") {
+							if (parse_int(val).has_value()) {
+								return true;
+							}
+						}
+						return false;
+					};
+					auto match = [&](std::string spec, std::string pathComp) {
 						if (spec[0] == ':') {
-							return true;
+							return matches_type(spec.substr(1), pathComp);
 						}
 						return spec == pathComp;
 					};

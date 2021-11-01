@@ -23,7 +23,7 @@ int main() {
 		);
 	});
 	// Route with one parameter
-	s.route<int>("/test/:help", [](qws::Request& req, int param) {
+	s.route<int>("/test/:int", [](qws::Request& req, int param) {
 		return qws::html(
 			qws::body(
 				qws::b(std::to_string(param) + "main page!")
