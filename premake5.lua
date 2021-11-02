@@ -5,6 +5,7 @@ workspace "qws"
 project "qws"
    kind "ConsoleApp"
    language "C++"
+   cppdialect "C++20"
    targetdir "bin/%{cfg.buildcfg}"
 
    links { "ws2_32" }

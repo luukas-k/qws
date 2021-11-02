@@ -1,11 +1,6 @@
 #pragma once
 
-#include <iostream>
-#include <string>
-#include <functional>
-#include <unordered_map>
-#include <optional>
-#include <memory>
+#include "pre.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -17,9 +12,6 @@
 #define DEFAULT_PORT "8080"
 
 namespace qws {
-
-	using u32 = uint32_t;
-	using u64 = uint64_t;
 
 	class Socket {
 	public:
@@ -138,23 +130,37 @@ namespace qws {
 		}
 		std::string build() {
 			std::string res;
-			res.append("HTTP/1.1 ");
-			res.append(std::to_string(m_Code));
-			res.append(" OK\r\n");
-			res.append("Content-Length: " + std::to_string(m_Content.size()) + "\n");
-			for (auto& c : m_Cookies) {
-				res.append("Set-Cookie: ");
-				res.append(c.name);
-				res.append("=");
-				res.append(c.value);
+			auto add_version_line = [&](int code, std::string status) {
+				res.append("HTTP/1.1 ");
+				res.append(std::to_string(code));
+				res.append(" " + status + "\r\n");
+			};
+			auto add_hdr = [&](std::string name, std::string value) {
+				res.append(create_header(name, value) + "\n");
+			};
+			auto add_cntnt = [&](std::string cntnt) {
 				res.append("\n");
+				res.append(cntnt);
+				res.append("\r\n\r\n");
+			};
+			if(m_Code == 200)
+				add_version_line(200, "OK");
+			else if(m_Code == 404)
+				add_version_line(404, "Not found");
+			else
+				add_version_line(500, "Internal Server Error");
+
+			add_hdr("Content-Length", std::to_string(m_Content.size()));
+			for (auto& c : m_Cookies) {
+				add_hdr("Set-Cookie", c.name + "=" + c.value);
 			}
-			res.append("Content-Type: text/html\n");
-			res.append("Connection: Closed\n");
-			res.append("\n");
-			res.append(m_Content);
-			res.append("\r\n\r\n");
+			add_hdr("Content-Type", "text/html");
+			add_hdr("Connection", "Closed");
+			add_cntnt(m_Content);
 			return res;
+		}
+		std::string create_header(std::string name, std::string value) {
+			return name + ": " + value;
 		}
 	private:
 		int m_Code;
