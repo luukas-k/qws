@@ -111,6 +111,11 @@ namespace qws {
 		std::string m_Request;
 	};
 
+	struct Cookie {
+		std::string name;
+		std::string value;
+	};
+
 	class ResponseBuilder {
 	public:
 		ResponseBuilder()
@@ -122,8 +127,14 @@ namespace qws {
 		void set_statuscode(int val) {
 			m_Code = val;
 		}
+		int get_statuscode() const {
+			return m_Code;
+		}
 		void set_content(std::string str) {
 			m_Content = str;
+		}
+		void add_cookie(const Cookie& c) {
+			m_Cookies.push_back(c);
 		}
 		std::string build() {
 			std::string res;
@@ -131,6 +142,13 @@ namespace qws {
 			res.append(std::to_string(m_Code));
 			res.append(" OK\r\n");
 			res.append("Content-Length: " + std::to_string(m_Content.size()) + "\n");
+			for (auto& c : m_Cookies) {
+				res.append("Set-Cookie: ");
+				res.append(c.name);
+				res.append("=");
+				res.append(c.value);
+				res.append("\n");
+			}
 			res.append("Content-Type: text/html\n");
 			res.append("Connection: Closed\n");
 			res.append("\n");
@@ -141,10 +159,14 @@ namespace qws {
 	private:
 		int m_Code;
 		std::string m_Content;
+		std::vector<Cookie> m_Cookies;
 	};
 
 	class Service {
 	public:
+		void route_404(std::function<std::string(Request&)> handler) {
+			m_Handler404 = handler;
+		}
 		void route(const std::string& pathSpec, std::function<std::string(Request&)> handler) {
 			m_Handlers[pathSpec] = handler;
 		}
@@ -244,6 +266,7 @@ namespace qws {
 				
 				ResponseBuilder rb;
 				rb.set_statuscode(404);
+				rb.add_cookie({.name = "testCookie", .value = "testValue"});
 				for (auto& h : m_Handlers) {
 					if (matches(h.first, r.path())) {
 						rb.set_statuscode(200);
@@ -251,15 +274,19 @@ namespace qws {
 						break;
 					}
 				}
+				if (rb.get_statuscode() == 404 && m_Handler404.has_value()) {
+					rb.set_content((*m_Handler404)(r));
+				}
 				s.send(rb.build());
 				std::cout << "Client served." << std::endl;
 				s.close();
 			});
-				
+			
 			st.detach();
 		}
 	private:
 		std::unordered_map<std::string, std::function<std::string(Request&)>> m_Handlers;
+		std::optional<std::function<std::string(Request&)>> m_Handler404;
 	};
 
 }
